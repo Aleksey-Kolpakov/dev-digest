@@ -27,7 +27,13 @@ _None yet._
 
 ## Codebase Patterns
 
-_None yet._
+- **2026-10-23** — `@devdigest/shared` exists as **two copies**, not one:
+  `server/src/vendor/shared/` and `client/src/vendor/shared/` (the client's
+  tsconfig alias points at its own copy). They have already drifted —
+  `diff -rq server/src/vendor/shared client/src/vendor/shared` lists 5 differing
+  files. A contract change made only server-side typechecks on both sides but
+  the client never sees the new field. Apply it to both copies, then diff the
+  touched file to confirm they match. `client/tsconfig.json:24`
 
 ## Tool & Library Notes
 
@@ -35,7 +41,14 @@ _None yet._
 
 ## Recurring Errors & Fixes
 
-_None yet._
+- **2026-10-23** — running `./scripts/e2e.sh` (`npm run e2e:hermetic`) while
+  your own `pnpm dev` is up on :3000 breaks the dev server: the hermetic
+  `next dev` on :3100 runs in the same `client/` dir and rewrites the shared
+  `client/.next`. Afterwards every hard load on :3000 shows endless skeletons,
+  the sidebar says "No repo selected", and the network tab shows
+  `_next/static/chunks/app/.../page.js → 404`. Touching the page source does not
+  fix it. Stop the dev server, `rm -rf client/.next`, start it again. Stop it
+  *before* running the hermetic suite. `scripts/e2e.sh:33`
 
 ## Open Questions
 

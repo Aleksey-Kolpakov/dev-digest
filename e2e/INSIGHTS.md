@@ -34,7 +34,12 @@ _None yet._
 
 ## Recurring Errors & Fixes
 
-_None yet._
+- **2026-10-23** — on a fresh clone, `npm run e2e:hermetic` boots the whole
+  stack and then dies with `sh: tsx: command not found` (exit 127):
+  `scripts/e2e.sh` `install_if_needed` installs `server/`, `client/` and
+  `reviewer-core/`, but never `e2e/` itself. Run `cd e2e && npm ci` once. If it
+  then fails every flow with `spawn agent-browser ENOENT`, the global CLI is
+  missing (step 1 of `e2e/README.md`). `scripts/e2e.sh:106`
 
 ## Open Questions
 
