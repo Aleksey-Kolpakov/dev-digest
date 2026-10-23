@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Provider } from './knowledge.js';
+import { FindingRecord } from './review-api.js';
 
 /**
  * Platform / scaffolding DTOs owned by F1:
@@ -173,6 +174,9 @@ export const PrMeta = z.object({
   // Cost (USD) of the latest review batch (list endpoint only). null/absent
   // when the PR has no priced run yet; UI shows "—", not "$0".
   cost_usd: z.number().nullish(),
+  // Open (non-dismissed) findings of the latest review batch (list endpoint
+  // only) — same batch the cost covers. Drives the FINDINGS column + popover.
+  latest_findings: z.array(FindingRecord).nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;
 

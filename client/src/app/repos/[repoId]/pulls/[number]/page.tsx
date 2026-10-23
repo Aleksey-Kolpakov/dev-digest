@@ -2,7 +2,7 @@
    - Findings panel (VerdictBanner + FindingCards)
    - RunReviewDropdown (run all / a specific agent) + live SSE RunStatus
    - Basic file-by-file diff viewer in the Files tab
-   Tab state lives in query (?tab). */
+   Tab state lives in query (?tab), as does the severity filter (?sev). */
 "use client";
 
 import React from "react";
@@ -15,6 +15,7 @@ import { OverviewTab } from "./_components/OverviewTab";
 import { FindingsTab } from "./_components/FindingsTab";
 import { DiffTab } from "./_components/DiffTab";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
+import { parseSeverity } from "./_components/SeverityFilter";
 import { usePullDetail, usePulls } from "../../../../../lib/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePrReviews, useCancelRun, usePrActiveRuns, usePrRuns, useDeleteRun } from "../../../../../lib/hooks/reviews";
@@ -59,6 +60,8 @@ export default function PRDetailPage() {
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
+  // PR-wide severity filter (?sev=CRITICAL) — shareable and survives reload.
+  const severity = parseSeverity(search.get("sev"));
   const setParam = (key: string, val: string | null) => {
     const sp = new URLSearchParams(search.toString());
     if (val == null) sp.delete(key);
@@ -147,6 +150,9 @@ export default function PRDetailPage() {
             prCommits={pr.commits}
             repoFullName={repoFullName}
             headSha={pr.head_sha}
+            allFindings={allFindings}
+            severity={severity}
+            onSeverityChange={(level) => setParam("sev", level)}
             cancelMutation={cancel}
             onOpenTrace={(id) => setParam("trace", id)}
             onDelete={(id) => {

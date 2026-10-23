@@ -18,7 +18,13 @@ _None yet._
 
 ## What Works
 
-_None yet._
+- **2026-10-23** — to eyeball a UI state the dev DB lacks (e.g. a PR whose
+  reviews have findings) without writing rows or paying for an LLM run:
+  hard-load some *other* route (`/agents`), override `window.fetch` in the page
+  to rewrite the response you need, then `window.next.router.push(<target>)`.
+  Patching on the target page itself does nothing: the query is already cached,
+  `refetchOnWindowFocus` is off and `staleTime` is 30s
+  (`client/src/lib/providers.tsx:28`), and any hard navigation drops the patch.
 
 ## What Doesn't Work
 
@@ -30,7 +36,12 @@ _None yet._
 
 ## Tool & Library Notes
 
-_None yet._
+- **2026-10-23** — `client/CLAUDE.md` lists `pnpm lint` (eslint,
+  exhaustive-deps as error), but `client/package.json` has no `lint` script and
+  no eslint dependency or config: `pnpm lint` fails with `Command "lint" not
+  found`. The working gate is `pnpm typecheck && pnpm test`. Existing
+  `// eslint-disable-next-line react-hooks/exhaustive-deps` comments are inert.
+  `client/package.json:5`
 
 ## Recurring Errors & Fixes
 

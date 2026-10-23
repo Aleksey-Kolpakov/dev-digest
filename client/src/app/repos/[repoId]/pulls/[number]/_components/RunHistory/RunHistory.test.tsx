@@ -4,10 +4,10 @@
  * a settled run is colored/labelled by its denormalized blocker/finding counts,
  * and shows the review score ring.
  */
-import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import type { RunSummary } from "@devdigest/shared";
+import type { FindingRecord, RunSummary } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 import { RunHistory } from "./RunHistory";
 
@@ -35,12 +35,33 @@ function run(o: Partial<RunSummary>): RunSummary {
   };
 }
 
-function renderRuns(runs: RunSummary[]) {
+function renderRuns(runs: RunSummary[], extra: Partial<React.ComponentProps<typeof RunHistory>> = {}) {
   return render(
     <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
-      <RunHistory runs={runs} onOpenTrace={() => {}} />
+      <RunHistory runs={runs} onOpenTrace={() => {}} {...extra} />
     </NextIntlClientProvider>,
   );
+}
+
+function finding(id: string, severity: FindingRecord["severity"]): FindingRecord {
+  return {
+    id,
+    severity,
+    category: "bug",
+    title: `Finding ${id}`,
+    file: "src/a.ts",
+    start_line: 1,
+    end_line: 1,
+    rationale: "r",
+    suggestion: null,
+    confidence: 0.9,
+    kind: "finding",
+    trifecta_components: null,
+    evidence: null,
+    review_id: "rv1",
+    accepted_at: null,
+    dismissed_at: null,
+  };
 }
 
 describe("RunHistory — outcome badge", () => {
@@ -84,5 +105,29 @@ describe("RunHistory — outcome badge", () => {
     renderRuns([run({ status: "done", tokens_in: 0, tokens_out: 0, cost_usd: null, score: 80 })]);
     expect(screen.getByText("—")).toBeInTheDocument();
     expect(screen.queryByText(/\$0\.00/)).not.toBeInTheDocument();
+  });
+});
+
+describe("RunHistory — severity counters", () => {
+  const findingsByRun = { "run-1": [finding("c1", "CRITICAL"), finding("c2", "CRITICAL"), finding("w1", "WARNING")] };
+
+  it("replaces the plain count with per-severity counters + keeps the blockers note", () => {
+    renderRuns([run({ findings_count: 3, blockers: 2, score: 38 })], { findingsByRun });
+    expect(screen.getByRole("button", { name: /3 findings: 2 critical, 1 warning/ })).toBeInTheDocument();
+    expect(screen.queryByText(/finding\(s\)/)).not.toBeInTheDocument();
+    expect(screen.getByText(/2 blockers/)).toBeInTheDocument();
+  });
+
+  it("clicking a finding in the popover jumps to the run's review", () => {
+    const onGoToReview = vi.fn();
+    renderRuns([run({ findings_count: 3, blockers: 2 })], { findingsByRun, onGoToReview });
+    fireEvent.click(screen.getByRole("button", { name: /3 findings/ }));
+    fireEvent.click(screen.getByText("Finding w1"));
+    expect(onGoToReview).toHaveBeenCalledWith("run-1");
+  });
+
+  it("falls back to the denormalized count when the run has no loaded review", () => {
+    renderRuns([run({ findings_count: 4, blockers: 0 })]);
+    expect(screen.getByText("4 finding(s)")).toBeInTheDocument();
   });
 });

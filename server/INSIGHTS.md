@@ -30,6 +30,13 @@ _None yet._
 
 ## Recurring Errors & Fixes
 
+- **2026-10-23** — in `test/integration.it.test.ts`, `seed()` already writes
+  reviews with findings (`created_at` = now) on the first imported PR, so a test
+  that inserts its own reviews and asserts "latest review/batch" gets the seed's
+  findings mixed in ("Hardcoded Stripe secret key in commit" shows up). Insert
+  test reviews with `createdAt` an hour in the future so they are unambiguously
+  newest. `server/test/integration.it.test.ts:146`
+
 - **2026-10-23** — `pnpm dev` dies at startup with `ZodError … Invalid enum
   value. Expected 'fatal' | 'error' | … received ''` on `path: [ 'LOG_LEVEL' ]`.
   `.env.example` ships `LOG_LEVEL=` empty, dotenv loads it as `''`, and `''` is
