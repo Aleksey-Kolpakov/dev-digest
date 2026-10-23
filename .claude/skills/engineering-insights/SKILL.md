@@ -1,98 +1,192 @@
 ---
 name: engineering-insights
-description: Captures non-obvious engineering insights into the touched module's INSIGHTS.md (client, server, reviewer-core, e2e). Use during a session the moment you hit something a future agent would otherwise relearn — a gotcha, a working approach, a dead-end antipattern, a codebase convention, a tool/library quirk, a recurring error+fix, or an open question — and again at session end, on "wrap up" / "retro", or when /engineering-insights is invoked. Reads the existing file first, never duplicates, writes only substantial file-grounded entries, and is strictly append-only (never overwrites).
+description: >-
+  Reads and records DevDigest's curated engineering insights. Use on EVERY user
+  request in this repo — questions and follow-ups included — before the first
+  other tool call: read the INSIGHTS.md of the folder the request concerns and
+  keep it in context. Use again at the END of every session or finished task to
+  record anything non-obvious that was learned back into that same file. Covers
+  which module a finding belongs to, which section it goes in, the specificity
+  bar an entry must clear, and the duplicate check that runs before writing.
+  Triggers: any user request in this repo, "insights", "INSIGHTS.md", "wrap up",
+  "what did we learn", "record this", "lesson learned", "session review",
+  "retro", end of a session in which something non-obvious was discovered.
 ---
 
-# Engineering Insights
+# engineering-insights
 
-Capture one durable engineering insight into the **INSIGHTS.md of the module the work
-touched**, so the next session doesn't relearn it. Read what's already there, add only
-what's new and substantial, never overwrite.
+A two-half loop over the `INSIGHTS.md` files. **Read** on every user request,
+**record** at the end of every session. Insights are module-local by design: a
+session working in `client/` reads `client/INSIGHTS.md`, not all five. Knowledge
+lives next to the code it is about.
 
-## Where to write (module routing)
+## Step 1 — Read first (mandatory, every request)
 
-Write to the file of the package the work actually touched:
+On **every** user request — a new task, a follow-up, or a plain question —
+before answering or touching code:
 
-| Work touched | File |
-|---|---|
-| client (`@devdigest/web`) | `client/INSIGHTS.md` |
-| server (`@devdigest/api`, incl. repo-intel) | `server/INSIGHTS.md` |
-| reviewer-core (`@devdigest/reviewer-core`) | `reviewer-core/INSIGHTS.md` |
-| e2e (`@devdigest/e2e`) | `e2e/INSIGHTS.md` |
-| spans several packages | write the part relevant to each, to each file |
-| pure root config / CI only | usually not a module insight — skip it |
+1. Resolve the module from the folder the request concerns, using the table
+   below. A request that names no folder (git, branches, running the stack)
+   resolves to the root file.
+2. Read that `INSIGHTS.md` in full. It is capped and short — read it, don't grep.
+   Already read it in this conversation and it hasn't changed since? It is still
+   in context; don't re-read it. A request that moves to another folder reads
+   that folder's file then.
+3. Read the root `INSIGHTS.md` as well when the work spans two or more packages.
+4. **Say in one line which file you read and whether it was relevant.** Example:
+   `Read server/INSIGHTS.md — nothing on SSE.` A silent read gets skipped; the
+   sentence is what makes it real.
+5. Apply what you read: an entry that covers the request changes how you do it.
 
-Never write insights into this SKILL.md itself.
+If a curated file answers the question, cite it instead of re-deriving from
+code. This is the order root `CLAUDE.md` already sets out: `specs/` → `docs/` →
+`INSIGHTS.md` → source.
 
-## What counts (the 7 sections)
+## Module resolution
 
-Each `INSIGHTS.md` has fixed sections — append each entry under the right one:
+| The work touches                                                            | File                        |
+| --------------------------------------------------------------------------- | --------------------------- |
+| `server/**`, including `src/modules/repo-intel/**`                           | `server/INSIGHTS.md`        |
+| `client/**`                                                                  | `client/INSIGHTS.md`        |
+| `reviewer-core/**`                                                           | `reviewer-core/INSIGHTS.md` |
+| `e2e/**`, `scripts/e2e.sh`                                                   | `e2e/INSIGHTS.md`           |
+| `scripts/`, `.github/`, `docker-compose.yml`, root docs, **or ≥2 packages**  | `INSIGHTS.md` (root)        |
 
-- **What Works** — an approach/solution that worked here.
-- **What Doesn't Work** — dead ends and antipatterns. **Highest-value section, most often skipped — prioritize it.**
-- **Codebase Patterns** — conventions and architectural decisions.
-- **Tool & Library Notes** — dependency quirks and gotchas.
-- **Recurring Errors & Fixes** — an error you'd hit again + the fix.
-- **Session Notes** — dated session summaries (use a `### YYYY-MM-DD` subheading).
-- **Open Questions** — what's still unresolved.
+Edge cases that get misfiled:
 
-## Concrete, not banal
+- **`server/src/vendor/shared/**` → root.** That is `@devdigest/shared`; a
+  contract change there reaches every package, so it is never server-local.
+- **`server/src/modules/repo-intel/` → `server/`.** It is a folder inside
+  `@devdigest/api`, not a package of its own.
+- **`client/src/vendor/**` → `client/`,** and only for insights about *consuming*
+  it. The vendored code itself is not ours to change.
+- A finding about the workflow itself (CI, `dev.sh`, package managers) → root.
 
-Test before writing: **"If this were obvious to anyone reading the code, don't write it."**
+## Step 2 — Record last (every session, writing is conditional)
 
-| ❌ Noise | ✅ Useful (actionable cold) |
-|---|---|
-| "Promises can be tricky" | "`Promise.all()` on the ingest pipeline times out after 30 items — use `Promise.allSettled()` in batches of 10" |
-| "be careful with context enrichment" | "context enrichment is best-effort: on unindexed/error, omit the section, never throw — `server/...:NN`" |
+Run this step at the end of every session, and whenever a task finishes inside
+a longer one — before the closing message, not after it. The check always runs;
+only the writing depends on the gate below. New entries go to the file of the
+folder the finding is about, which may differ from the one you read in Step 1.
+
+### 2a. Gate — is there anything to record?
+
+Judge the session by feel, not by counting. A typo, a rename, a routine feature
+that went exactly as expected → **write nothing, say "nothing worth recording",
+stop.** Recording noise is worse than recording nothing.
+
+If something non-obvious did happen, collect candidates and rank them — highest
+signal first:
+
+1. **User corrections** — an explicit "no, do it this way". Highest signal there
+   is; the repo was wrong or the agent's default was wrong.
+2. **Approaches that failed** — what was tried and abandoned, and why.
+3. **Repeated friction** — the same error or workaround hit more than once.
+4. **Conventions discovered by reading code** — things `CLAUDE.md` doesn't say.
+5. **Dependency and toolchain quirks.**
+
+**Cap at 3 entries per session**, even when more candidates exist. If everything
+looks worth writing, the bar is being applied too loosely.
+
+### 2b. Write
+
+For each surviving candidate:
+
+1. **Read the target file** before writing it.
+2. **Check for a duplicate** — `grep -i '<key identifier>' <module>/INSIGHTS.md`.
+   If a near-duplicate is there, **refine that entry** — sharpen the claim,
+   update the date, add the evidence — instead of appending a near-copy.
+3. **Append** under the right section, newest first within that section.
+4. If an entry contradicts an existing one, do **not** write both. Correct the
+   old one and note what changed.
+
+Never delete an entry that still holds. When something an entry warns about gets
+fixed in code, don't delete it either — mark it, so the next reader knows the
+warning is historical:
+
+```markdown
+- **2026-07-31** — … original claim … **Fixed 2026-08-14 in `server/src/…`.**
+```
+
+### 2c. Report
+
+One line per action, then stop. No trailing commentary.
+
+```
+server/INSIGHTS.md — added under What Doesn't Work: 422 on empty body …
+Skipped: grounding-gate note (already covered by the 2026-07-31 entry)
+```
+
+## Which section
+
+| Section                    | What belongs there                                          |
+| -------------------------- | ------------------------------------------------------------ |
+| `Decisions`                | A choice made, with the alternative that was rejected        |
+| `What Works`               | An approach that solved something and should be reused       |
+| `What Doesn't Work`        | A dead end — the section most often skipped, and the most valuable |
+| `Codebase Patterns`        | A convention you had to discover by reading the code         |
+| `Tool & Library Notes`     | A quirk of a dependency, CLI, or the toolchain               |
+| `Recurring Errors & Fixes` | A symptom you will hit again, and its cause                  |
+| `Open Questions`           | Something left unresolved, so the next session knows          |
 
 ## Entry format
 
-Append a bullet under the matching `##` section:
+`Decisions` keeps the existing three-line prose form:
 
-```
-- **YYYY-MM-DD** — <concrete, actionable insight>. Evidence: `path/file.ts:NN`.
-```
+```markdown
+### 2026-07-31 — Mechanical grounding gate, not a trusted model
 
-Session Notes instead group under a dated subheading:
-
-```
-### YYYY-MM-DD
-- <what the session accomplished / decided, one line per point>
+**What:** the decision, in one sentence.
+**Why:** the constraint that forced it.
+**Rejected:** what was tried, and how it failed.
 ```
 
-## Workflow
+Every other section takes a dated bullet — claim first, evidence last:
 
-Copy this checklist and work through it:
-
-```
-- [ ] 1. Gate check — was this session substantial?
-- [ ] 2. Read the touched module's INSIGHTS.md
-- [ ] 3. Draft ≤5 candidates, ranked by signal
-- [ ] 4. Dedup against what's already there
-- [ ] 5. Append automatically (append-only)
-- [ ] 6. One-line summary
+```markdown
+- **2026-07-31** — plain `npm test` in `e2e/` fails flows 02/04/05 against the
+  dev DB: flow 02 follows the home redirect to the *first* repo and a dev DB has
+  several. Use `npm run e2e:hermetic`. `e2e/specs/02-repo-overview.flow.json`
 ```
 
-1. **Gate check.** Did the session produce something substantial — a problem solved, a decision made, a non-obvious discovery? If not → **write nothing** and stop.
-2. **Read first.** Open the touched module's `INSIGHTS.md` before drafting anything.
-3. **Draft ≤5 candidates**, ranked by signal (user corrections and gotchas highest; nice-to-know patterns lowest). Each candidate = the exact proposed line + its target section + `file:line` evidence.
-4. **Dedup.** Drop any candidate already covered by an existing entry. If reality contradicts an old entry, add a new dated note that supersedes it — never edit the old one.
-5. **Append** the survivors (automatic mode — no approval prompt). If nothing substantial survives gate + dedup, write nothing.
-6. **Summary.** One line: what was written, to which file, what was skipped.
+House style: hard-wrap at ~79 columns, backtick every path and identifier, quote
+the **actual** error string, and end with a `path:line` or a runnable command
+wherever one exists.
 
-## Non-destructive write contract (hard rule)
+## The bar
 
-This skill is **append-only** and must never clobber existing content:
+An entry must be actionable **cold** — the next session reads it and knows what
+to do without re-deriving anything.
 
-- **Re-read the target `INSIGHTS.md` immediately before writing** — its state may have changed since the session started.
-- **Insert with an anchored `Edit`** that adds the new bullet under the correct `##` heading. **Never use the `Write` tool on an existing `INSIGHTS.md`** — `Write` replaces the whole file and would destroy prior content.
-- **Preserve verbatim** the `# Insights — …` header, the preamble, every section heading, and every entry already in the file. New content is only ever *added*.
-- **Corrections are additive** — supersede a wrong entry with a new dated note; do not rewrite or delete the old one.
-- **Idempotent** — if an equivalent entry already exists, skip it (no duplicate, no rewrite).
+| ✗ Noise                      | ✓ Insight                                                                                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "e2e tests can be flaky"     | "flows assume exactly one seeded repo — flow 02 follows the home redirect to the *first* one, so the dev DB fails 02/04/05; use `npm run e2e:hermetic`" |
+| "be careful with migrations" | "`relation … does not exist` on a fresh clone means migrations were skipped — they do not run on boot. `cd server && pnpm db:migrate`"               |
+| "Promises can be tricky"     | "`Promise.all()` over the ingest pipeline times out past ~30 items — use `Promise.allSettled()` in batches of 10"                                    |
 
-## Maintenance (not per-session)
+**The test: if it would be obvious to anyone reading the code, don't write it.**
+Generic advice is the failure mode — "use async carefully" is true everywhere and
+therefore useful nowhere.
 
-Append-only keeps the file growing, so keep it lean out of band: prune monthly (drop
-fixed-bug, duplicate, and never-needed entries), aim for ~30 high-value entries per file
-before splitting into domain files, and treat the file as a reviewed draft — spot-check it,
-since an incorrect entry propagates to every future session until corrected.
+## Keeping the files lean
+
+- Roughly **5 entries per section**. Past that, signal drops.
+- When an entry becomes stable reference material, **promote it into
+  `<module>/docs/` and delete it here.** That path is what keeps these short.
+- An entry that no longer holds is worse than no entry. Correct or mark it.
+
+## Anti-patterns
+
+- Writing an entry because the session was long, rather than because something
+  was learned.
+- A title instead of content — "fixed the SSE bug" tells the next session
+  nothing. Write the claim, not the label.
+- Filing everything under `What Works`.
+- Appending a fifth variation of an entry that already exists.
+- Recording what `CLAUDE.md`, `README.md`, or `docs/` already says.
+
+## What this skill does not do
+
+It captures insights only. It does not review code, write documentation, update
+`specs/`, or run tests. `INSIGHTS.md` is not a session diary — it holds durable
+findings, not a record of what happened.
