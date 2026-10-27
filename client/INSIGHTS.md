@@ -1,25 +1,52 @@
 # Insights — client
 
-Non-obvious findings and gotchas. Add an entry whenever something surprised you,
-so the next agent/session doesn't relearn it. Append-only — see the
-`engineering-insights` skill for how entries are captured.
+UI decisions and dead ends. Read before restructuring pages, state, or the data
+layer.
+
+Read at the start of a task, written at the end of one, by the
+`engineering-insights` skill. Append-only — correct a stale entry with a dated
+note beneath it rather than editing it away.
+
+The seven sections below are fixed and identical in every file; never invent a
+new heading. The `engineering-insights` skill holds the entry format, the quality
+bar, and which section a finding belongs in. Cross-package findings go to the
+root [`INSIGHTS.md`](../INSIGHTS.md) instead.
+
+## Decisions
+
+_None yet._
 
 ## What Works
 
-- **2026-06-14** — `formatCost` (`src/lib/cost.ts`) distinguishes MISSING data (`null`/`undefined` → "—") from a genuine zero (`0` → "$0.00"), widens precision for sub-cent values (~2 sig figs), and trims trailing zeros to a 2dp floor ("$0.06" not "$0.060", "$0.0013" not "$0.00"). Reuse it for any per-run money display.
+- **2026-10-23** — to eyeball a UI state the dev DB lacks (e.g. a PR whose
+  reviews have findings) without writing rows or paying for an LLM run:
+  hard-load some *other* route (`/agents`), override `window.fetch` in the page
+  to rewrite the response you need, then `window.next.router.push(<target>)`.
+  Patching on the target page itself does nothing: the query is already cached,
+  `refetchOnWindowFocus` is off and `staleTime` is 30s
+  (`client/src/lib/providers.tsx:28`), and any hard navigation drops the patch.
 
 ## What Doesn't Work
 
+_None yet._
+
 ## Codebase Patterns
 
-- **2026-06-14** — Cross-route shared components live in `src/components/<Name>/` with an `index.ts` barrel, imported via `@/components/<Name>` (e.g. `RunCostBadge`, `diff-viewer`). Vendored UI primitives (`Badge`, `CircularScore`) live in `src/vendor/ui` under `@devdigest/ui` — different home. Evidence: `client/src/components/RunCostBadge/`.
-- **2026-06-14** — The PR-list table is driven by two parallel constants that MUST stay length-aligned: `COLUMN_KEYS` (header keys + order) and `GRID` (CSS grid-template tracks). Adding a column = add to both AND render a matching cell in `PRRow.tsx`, else header/cells misalign silently. Evidence: `client/src/app/repos/[repoId]/pulls/constants.ts`.
-- **2026-06-14** — i18n has only the `en` locale (`client/messages/en/`); new UI strings need a key under the right namespace file (e.g. `prReview.json`, `runs.json`) read via `useTranslations("<ns>")`. A missing key renders the raw key, not an error.
+_None yet._
 
 ## Tool & Library Notes
 
+- **2026-10-23** — `client/CLAUDE.md` lists `pnpm lint` (eslint,
+  exhaustive-deps as error), but `client/package.json` has no `lint` script and
+  no eslint dependency or config: `pnpm lint` fails with `Command "lint" not
+  found`. The working gate is `pnpm typecheck && pnpm test`. Existing
+  `// eslint-disable-next-line react-hooks/exhaustive-deps` comments are inert.
+  `client/package.json:5`
+
 ## Recurring Errors & Fixes
 
-## Session Notes
+_None yet._
 
 ## Open Questions
+
+_None yet._

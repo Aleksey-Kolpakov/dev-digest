@@ -131,6 +131,59 @@ d('Testcontainers: DB-backed routes via app.inject', () => {
     await app.close();
   });
 
+  it('GET /repos/:id/pulls returns the open findings of the latest review batch', async () => {
+    const config = loadConfig({ ...process.env, NODE_ENV: 'test' } as NodeJS.ProcessEnv);
+    const app = await buildApp({
+      config,
+      db: pg.handle.db,
+      overrides: { git: new MockGitClient(), github: new MockGitHubClient() },
+    });
+    const { db } = pg.handle;
+    const repoId = (await app.inject({ method: 'GET', url: '/repos' })).json()[0]!.id;
+    await app.inject({ method: 'GET', url: `/repos/${repoId}/pulls` });
+    const [pr] = await db.select().from(t.pullRequests).where(eq(t.pullRequests.repoId, repoId));
+
+    // Two reviews 30s apart form the latest batch; one 10 min older does not.
+    // Anchored an hour ahead so the seed's own reviews fall outside the batch.
+    const at = (msAgo: number) => new Date(Date.now() + 3_600_000 - msAgo);
+    const [old, a, b] = await db
+      .insert(t.reviews)
+      .values(
+        [600_000, 30_000, 0].map((msAgo) => ({
+          workspaceId: pr!.workspaceId,
+          prId: pr!.id,
+          kind: 'review' as const,
+          score: 70,
+          createdAt: at(msAgo),
+        })),
+      )
+      .returning();
+    const finding = (reviewId: string, title: string, severity: string, dismissed = false) => ({
+      reviewId,
+      title,
+      severity,
+      file: 'src/a.ts',
+      startLine: 1,
+      endLine: 1,
+      category: 'bug',
+      rationale: 'r',
+      confidence: 0.9,
+      dismissedAt: dismissed ? new Date() : null,
+    });
+    await db.insert(t.findings).values([
+      finding(old!.id, 'stale', 'CRITICAL'),
+      finding(a!.id, 'kept-a', 'WARNING'),
+      finding(b!.id, 'kept-b', 'CRITICAL'),
+      finding(b!.id, 'dismissed', 'SUGGESTION', true),
+    ]);
+
+    const list = (await app.inject({ method: 'GET', url: `/repos/${repoId}/pulls` })).json();
+    const row = list.find((p: { id: string }) => p.id === pr!.id);
+    const titles = row.latest_findings.map((f: { title: string }) => f.title).sort();
+    expect(titles).toEqual(['kept-a', 'kept-b']);
+    await app.close();
+  });
+
   it('POST /repos/:id/poll syncs PR list and does NOT trigger a review', async () => {
     const config = loadConfig({ ...process.env, NODE_ENV: 'test' } as NodeJS.ProcessEnv);
     const app = await buildApp({

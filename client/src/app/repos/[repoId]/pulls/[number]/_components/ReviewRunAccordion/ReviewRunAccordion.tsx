@@ -6,8 +6,10 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { Icon, Badge } from "@devdigest/ui";
-import type { ReviewRecord, Verdict } from "@devdigest/shared";
+import type { ReviewRecord, Severity, Verdict } from "@devdigest/shared";
+import { RunCostBadge } from "@/components/RunCostBadge";
 import { FindingsPanel } from "../FindingsPanel";
 import { VerdictBanner } from "../VerdictBanner";
 import { useDeleteReview } from "../../../../../../../lib/hooks/reviews";
@@ -31,6 +33,9 @@ export function ReviewRunAccordion({
   headSha,
   targetRunId = null,
   targetNonce = 0,
+  severity = null,
+  costUsd,
+  onOpenTrace,
 }: {
   review: ReviewRecord;
   prId: string;
@@ -41,7 +46,14 @@ export function ReviewRunAccordion({
    *  (driven from the Timeline: clicking an agent name navigates here). */
   targetRunId?: string | null;
   targetNonce?: number;
+  /** PR-wide severity filter, forwarded to this run's findings list. */
+  severity?: Severity | null;
+  /** Generation cost of the run that produced this review (from its RunSummary). */
+  costUsd?: number | null;
+  /** Open this run's trace + log drawer. */
+  onOpenTrace?: (runId: string) => void;
 }) {
+  const t = useTranslations("prReview");
   const [open, setOpen] = React.useState(defaultOpen);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   React.useEffect(() => {
@@ -104,8 +116,36 @@ export function ReviewRunAccordion({
           </Badge>
         )}
         <span className="mono" style={{ fontSize: 12, color: "var(--text-muted)" }}>
+          <RunCostBadge variant="compact" cost={costUsd} />
+        </span>
+        <span className="mono" style={{ fontSize: 12, color: "var(--text-muted)" }}>
           {formatWhen(review.created_at)}
         </span>
+        {onOpenTrace && review.run_id && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenTrace(review.run_id!);
+            }}
+            title={t("timeline.openTrace")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              background: "none",
+              border: "none",
+              padding: 0,
+              font: "inherit",
+              fontSize: 12.5,
+              color: "var(--accent-text)",
+              cursor: "pointer",
+            }}
+          >
+            <Icon.FileText size={13} />
+            {t("timeline.trace")}
+          </button>
+        )}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -152,6 +192,7 @@ export function ReviewRunAccordion({
             prId={prId}
             repoFullName={repoFullName}
             headSha={headSha}
+            severity={severity}
           />
         </div>
       )}

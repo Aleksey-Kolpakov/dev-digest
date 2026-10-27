@@ -48,6 +48,13 @@ describe("FindingsPanel (smoke)", () => {
     expect(screen.getByText("Hardcoded secret")).toBeInTheDocument();
   });
 
+  it("shows only the selected severity", () => {
+    const warning: FindingRecord = { ...FINDINGS[0]!, id: "f2", severity: "WARNING", title: "Slow loop" };
+    renderWithIntl(<FindingsPanel findings={[...FINDINGS, warning]} prId="pr1" severity="WARNING" />);
+    expect(screen.getByText("Slow loop")).toBeInTheDocument();
+    expect(screen.queryByText("Hardcoded secret")).not.toBeInTheDocument();
+  });
+
   it("shows the empty state when nothing matches", () => {
     renderWithIntl(<FindingsPanel findings={[]} prId="pr1" />);
     expect(screen.getByText("No findings match")).toBeInTheDocument();

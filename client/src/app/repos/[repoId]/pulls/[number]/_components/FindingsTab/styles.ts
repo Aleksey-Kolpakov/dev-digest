@@ -41,6 +41,9 @@ export const s = {
   timelineSection: {
     marginBottom: 18,
   } satisfies CSSProperties,
+  severityBar: {
+    marginBottom: 14,
+  } satisfies CSSProperties,
   cancelActions: {
     display: "flex",
     gap: 8,

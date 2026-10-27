@@ -5,8 +5,9 @@ import { Icon, Badge, Button, SectionLabel, EmptyState } from "@devdigest/ui";
 import { RunStatus } from "../RunStatus";
 import { RunHistory } from "../RunHistory/RunHistory";
 import { ReviewRunAccordion } from "../ReviewRunAccordion";
+import { SeverityFilter } from "../SeverityFilter";
 import { s } from "./styles";
-import type { FindingRecord, ReviewRecord, RunSummary, PrCommit } from "@devdigest/shared";
+import type { FindingRecord, ReviewRecord, RunSummary, PrCommit, Severity } from "@devdigest/shared";
 import type { UseMutationResult } from "@tanstack/react-query";
 
 interface FindingsTabProps {
@@ -21,6 +22,11 @@ interface FindingsTabProps {
   /** owner/repo + head sha — used to deep-link a finding's file:line to GitHub. */
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Every run's findings — the base for the PR-wide severity counters. */
+  allFindings: FindingRecord[];
+  /** Active severity filter (from `?sev`); null shows every level. */
+  severity: Severity | null;
+  onSeverityChange: (level: Severity | null) => void;
   onOpenTrace: (id: string) => void;
   onDelete: (id: string) => void;
   onRunDone: () => void;
@@ -37,6 +43,9 @@ export function FindingsTab({
   cancelMutation,
   repoFullName,
   headSha,
+  allFindings,
+  severity,
+  onSeverityChange,
   onOpenTrace,
   onDelete,
   onRunDone,
@@ -70,6 +79,26 @@ export function FindingsTab({
   const handleGoToReview = useCallback((runId: string) => {
     setTarget((p) => ({ runId, n: (p?.n ?? 0) + 1 }));
   }, []);
+
+  // Timeline ↔ review join by run_id: each run's open findings (counters +
+  // popover) and each review's run cost (accordion header).
+  const findingsByRun = React.useMemo(() => {
+    const map: Record<string, FindingRecord[]> = {};
+    for (const r of runs) {
+      if (r.run_id) map[r.run_id] = r.findings.filter((f) => !f.dismissed_at);
+    }
+    return map;
+  }, [runs]);
+  const costByRun = React.useMemo(
+    () => new Map((prRuns ?? []).map((r) => [r.run_id, r.cost_usd])),
+    [prRuns],
+  );
+
+  // With a severity picked, runs holding none of that level drop out of the list.
+  const shownRuns = React.useMemo(
+    () => (severity ? runs.filter((r) => r.findings.some((f) => f.severity === severity)) : runs),
+    [runs, severity],
+  );
 
   return (
     <section>
@@ -131,6 +160,9 @@ export function FindingsTab({
           <RunHistory
             runs={prRuns ?? []}
             commits={prCommits}
+            findingsByRun={findingsByRun}
+            repoFullName={repoFullName}
+            headSha={headSha}
             onOpenTrace={handleOpenTrace}
             onGoToReview={handleGoToReview}
             onDelete={handleDelete}
@@ -144,6 +176,11 @@ export function FindingsTab({
       >
         Review runs
       </SectionLabel>
+      {allFindings.length > 0 && (
+        <div style={s.severityBar}>
+          <SeverityFilter findings={allFindings} active={severity} onChange={onSeverityChange} />
+        </div>
+      )}
       {runs.length === 0 ? (
         reviewRunning || liveRunIds.length > 0 ? null : (
           <EmptyState
@@ -154,7 +191,7 @@ export function FindingsTab({
         )
       ) : (
         prId &&
-        runs.map((review, i) => (
+        shownRuns.map((review, i) => (
           <ReviewRunAccordion
             key={review.id}
             review={review}
@@ -164,6 +201,9 @@ export function FindingsTab({
             headSha={headSha}
             targetRunId={target?.runId ?? null}
             targetNonce={target?.n ?? 0}
+            severity={severity}
+            costUsd={review.run_id ? costByRun.get(review.run_id) : null}
+            onOpenTrace={handleOpenTrace}
           />
         ))
       )}

@@ -1,19 +1,46 @@
 # Insights — e2e
 
-Non-obvious findings and gotchas. Add an entry whenever something surprised you,
-so the next agent/session doesn't relearn it. Append-only — see the
-`engineering-insights` skill for how entries are captured.
+Decisions about the browser suite and dead ends. Read before adding a flow or
+"fixing" a flaky one.
+
+Read at the start of a task, written at the end of one, by the
+`engineering-insights` skill. Append-only — correct a stale entry with a dated
+note beneath it rather than editing it away.
+
+The seven sections below are fixed and identical in every file; never invent a
+new heading. The `engineering-insights` skill holds the entry format, the quality
+bar, and which section a finding belongs in. Cross-package findings go to the
+root [`INSIGHTS.md`](../INSIGHTS.md) instead.
+
+## Decisions
+
+_None yet._
 
 ## What Works
 
+_None yet._
+
 ## What Doesn't Work
+
+_None yet._
 
 ## Codebase Patterns
 
+_None yet._
+
 ## Tool & Library Notes
+
+_None yet._
 
 ## Recurring Errors & Fixes
 
-## Session Notes
+- **2026-10-23** — on a fresh clone, `npm run e2e:hermetic` boots the whole
+  stack and then dies with `sh: tsx: command not found` (exit 127):
+  `scripts/e2e.sh` `install_if_needed` installs `server/`, `client/` and
+  `reviewer-core/`, but never `e2e/` itself. Run `cd e2e && npm ci` once. If it
+  then fails every flow with `spawn agent-browser ENOENT`, the global CLI is
+  missing (step 1 of `e2e/README.md`). `scripts/e2e.sh:106`
 
 ## Open Questions
+
+_None yet._

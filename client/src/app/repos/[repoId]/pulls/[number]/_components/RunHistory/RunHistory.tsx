@@ -3,8 +3,9 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
-import type { RunSummary, PrCommit } from "@devdigest/shared";
+import type { RunSummary, PrCommit, FindingRecord } from "@devdigest/shared";
 import { RunCostBadge } from "@/components/RunCostBadge";
+import { FindingCounts } from "@/components/FindingCounts";
 
 /**
  * PR timeline — every agent run interleaved with the PR's commits, newest-first
@@ -16,6 +17,10 @@ import { RunCostBadge } from "@/components/RunCostBadge";
  * run that found blockers reads "rejected" (red), never a green "done". Outcome
  * is derived from the denormalized blocker/finding counts on the run row, so it
  * matches the CI gate (deterministic) rather than the model's verdict.
+ *
+ * A settled run whose review is loaded shows per-severity counters of its open
+ * findings; clicking them opens a popover, and a finding there jumps to the
+ * run's accordion below.
  */
 
 type Outcome = { key: string; color: string; bg: string; icon: IconName };
@@ -88,12 +93,20 @@ function tsOf(s: string | null | undefined): number {
 export function RunHistory({
   runs,
   commits = [],
+  findingsByRun = {},
+  repoFullName,
+  headSha,
   onOpenTrace,
   onGoToReview,
   onDelete,
 }: {
   runs: RunSummary[];
   commits?: PrCommit[];
+  /** Open (non-dismissed) findings per run_id, from the run's persisted review. */
+  findingsByRun?: Record<string, FindingRecord[]>;
+  /** owner/repo + head sha — deep-link a finding's file:line to GitHub. */
+  repoFullName?: string | null;
+  headSha?: string | null;
   /** Open the trace + log drawer for a run (the logs icon). */
   onOpenTrace: (runId: string) => void;
   /** Jump to this run's inline review accordion below (clicking the agent name). */
@@ -150,6 +163,7 @@ export function RunHistory({
         const r = item.run;
         const o = outcomeOf(r);
         const settled = r.status === "done";
+        const open = findingsByRun[r.run_id];
         return (
           <div key={`run:${r.run_id}`} style={rowStyle}>
             <Badge color={o.color} bg={o.bg} icon={o.icon}>
@@ -190,8 +204,19 @@ export function RunHistory({
                 </div>
               )}
               {settled && (
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                  {t("runStatus.findings", { count: r.findings_count ?? 0 })}
+                <div style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 12, color: "var(--text-muted)" }}>
+                  {open && open.length > 0 ? (
+                    <FindingCounts
+                      findings={open}
+                      onSelect={onGoToReview ? () => onGoToReview(r.run_id) : undefined}
+                      repoFullName={repoFullName}
+                      headSha={headSha}
+                    />
+                  ) : (
+                    // No open findings, or no review loaded for this run (deleted,
+                    // or a pre-review run) — fall back to the denormalized count.
+                    t("runStatus.findings", { count: open ? 0 : r.findings_count ?? 0 })
+                  )}
                   {(r.blockers ?? 0) > 0 ? t("runStatus.blockers", { count: r.blockers ?? 0 }) : ""}
                 </div>
               )}
